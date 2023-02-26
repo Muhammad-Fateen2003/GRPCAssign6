@@ -1,14 +1,17 @@
-package example.grpcclient;
+package examples.grpcclient;
 
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+
+import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 import service.*;
-import test.TestProtobuf;
+import examples.TestProtobuf;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import com.google.protobuf.Empty; // needed to use Empty
 
@@ -22,6 +25,8 @@ public class EchoClient {
   private final EchoGrpc.EchoBlockingStub blockingStub;
   private final JokeGrpc.JokeBlockingStub blockingStub2;
   private final RegistryGrpc.RegistryBlockingStub blockingStub3;
+  private final WeatherGrpc.WeatherBlockingStub blockingStub4;
+  private final HometownsGrpc.HometownsBlockingStub blockingStub5;
 
   /** Construct client for accessing server using the existing channel. */
   public EchoClient(Channel channel, Channel regChannel) {
@@ -34,13 +39,11 @@ public class EchoClient {
     blockingStub = EchoGrpc.newBlockingStub(channel);
     blockingStub2 = JokeGrpc.newBlockingStub(channel);
     blockingStub3 = RegistryGrpc.newBlockingStub(regChannel);
+    blockingStub4 = WeatherGrpc.newBlockingStub(channel);
+    blockingStub5 = HometownsGrpc.newBlockingStub(channel);
   }
 
   public void askServerToParrot(String message) {
-
-    
-
-
     ClientRequest request = ClientRequest.newBuilder().setMessage(message).build();
     ServerResponse response;
     try {
@@ -82,6 +85,113 @@ public class EchoClient {
     }
   }
 
+  public void getWeatherAtCooridates(double lat, double lon) {
+    WeatherCoordinateRequest request = WeatherCoordinateRequest.newBuilder()
+    .setLatitude(lat)
+    .setLongitude(lon)
+    .build();
+    WeatherResponse response;
+
+    try {
+      response = blockingStub4.atCoordinates(request);
+      System.out.println(response.getCurrentTemp());
+      System.out.println(response.getCurrentConditions());
+      for (double dailyHigh : response.getDailyHighsList()) {
+        System.out.println(dailyHigh);
+      }
+    } catch (Exception e) {
+      // TODO: handle exception
+      System.err.println("RPC failed: " + e);
+      return;
+    }
+  }
+
+  public void getWeatherInCity(String city) {
+    WeatherCityRequest request = WeatherCityRequest.newBuilder()
+    .setCityName(city)
+    .build();
+    WeatherResponse response;
+    try {
+      response = blockingStub4.inCity(request);
+      System.out.println(response.getCurrentTemp());
+      System.out.println(response.getCurrentConditions());
+      for (double dailyHigh : response.getDailyHighsList()) {
+        System.out.println(dailyHigh);
+      }
+    } catch (Exception e) {
+      // TODO: handle exception
+      System.err.println("RPC failed: " + e);
+      return;
+    }
+  }
+
+  public void getCityList() {
+    Empty empty = Empty.newBuilder().build();
+    CitiesResponse response;
+    try {
+      response = blockingStub4.listCities(empty);
+      System.out.println("Available Cities: ");
+      for (String city : response.getCityNameList()) {
+        System.out.println(city);        
+      }
+    } catch (Exception e) {
+      // TODO: handle exception
+      System.err.println("RPC failed: " + e);
+      return;
+    }
+
+  }
+
+  public void readHomeTowns() {
+    Empty empty = Empty.newBuilder().build();
+    HometownsReadResponse response;
+    try {
+      response = blockingStub5.read(empty);
+      System.out.println("Name\t City\t Region\t");
+      for (Hometown hometown : response.getHometownsList()) {
+        System.out.println(hometown.getName() + "\t " + hometown.getCity() + "\t " + hometown.getRegion());
+      }
+    } catch (Exception e) {
+      // TODO: handle exception
+      System.err.println("RPC failed: " + e);
+      return;
+    }
+  }
+
+  public void writeHomeTowns(String name, String city, String region) {
+    HometownsWriteRequest request = HometownsWriteRequest.newBuilder().setHometown(Hometown
+    .newBuilder().setName(name)
+    .setCity(city).setRegion(region)
+    .build()).build();
+    HometownsWriteResponse response;
+    try {
+      response = blockingStub5.write(request);
+      if (response.getIsSuccess()) {
+        System.out.println("Success!");
+      } else {
+        System.out.println("Error!");
+      }
+    } catch (Exception e) {
+      // TODO: handle exception
+      System.err.println("RPC failed: " + e);
+      return;
+    }
+  }
+
+  public void searchHomeTowns(String city) {
+    HometownsSearchRequest request = HometownsSearchRequest.newBuilder()
+    .setCity(city).build();
+    HometownsReadResponse response;
+    try {
+      response = blockingStub5.search(request);
+      for (Hometown hometown : response.getHometownsList()) {
+        System.out.println(hometown.getName() + "\t " + hometown.getCity() + "\t " + hometown.getRegion());
+      }
+    } catch (Exception e) {
+      // TODO: handle exception
+    }
+  }
+
   public void getServices() {
     GetServicesReq request = GetServicesReq.newBuilder().build();
     ServicesListRes response;
@@ -117,6 +227,19 @@ public class EchoClient {
       return;
     }
   }
+
+  public static void printMenu() {
+    System.out.println("Choose Which Service you want to run:");
+    System.out.println("1. Weather/listCities");
+    System.out.println("2. Weather/inCity");
+    System.out.println("3. Weather/atCoordinates");
+    System.out.println("4. Hometowns/search");
+    System.out.println("5. Hometowns/read");
+    System.out.println("6. Hometowns/write");
+    System.out.println("0. Exit");
+  }
+
+
 
   public static void main(String[] args) throws Exception {
     if (args.length != 6) {
@@ -184,6 +307,62 @@ public class EchoClient {
 
       // call the parrot service on the server
       client.askServerToParrot(message);
+      boolean quit = false;
+      while(!quit){
+        printMenu();
+        Scanner scanner = new Scanner(new InputStreamReader(System.in));
+        int key = scanner.nextInt();
+        switch (key) {
+          case 1:
+            client.getCityList();
+            break;
+          case 2:
+            System.out.println("Enter City Name: ");
+            String city = scanner.next();
+            client.getWeatherInCity(city);
+            break;
+          case 3:
+            System.out.println("Enter Latitude: ");
+            double lat = scanner.nextDouble();
+            System.out.println("Enter Longitude: ");
+            double lon = scanner.nextDouble();
+            client.getWeatherAtCooridates(lat, lon);          
+            break;
+          case 4:
+            System.out.println("Enter your name: ");
+            String name = scanner.next();
+            System.out.println("Enter the name of your city: ");
+            String cityName = scanner.next();
+            System.out.println("Enter the name of your region: ");
+            String region = scanner.next();
+            client.writeHomeTowns(name, cityName, region);
+            break;
+          case 5:
+            client.readHomeTowns();
+            break;
+          case 6:
+            System.out.println("Enter the name of a city: ");
+            String cityString = scanner.next();
+            client.searchHomeTowns(cityString);
+            break;
+          case 0:
+            quit = true;
+            break;
+          default:
+            break;
+        }
+    }
+
+
+
+      // client.getWeatherAtCooridates(33.4484, -112.0740);
+
+      // client.getWeatherInCity("Mecca");
+
+      // client.writeHomeTowns("Muhammad", "TX", "SOUTH");
+      // client.writeHomeTowns("Zaynab", "NY", "NORTH");
+      // client.readHomeTowns();
+      // client.searchHomeTowns("NY");
 
       // ask the user for input how many jokes the user wants
       BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));

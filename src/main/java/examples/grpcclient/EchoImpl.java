@@ -1,4 +1,4 @@
-package example.grpcclient;
+package examples.grpcclient;
 
 import io.grpc.stub.StreamObserver;
 import service.*;

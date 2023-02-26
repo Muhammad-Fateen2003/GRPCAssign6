@@ -1,4 +1,4 @@
-package examples.grpcclient;
+package example.grpcclient;
 
 import java.util.ArrayList;
 import service.*;

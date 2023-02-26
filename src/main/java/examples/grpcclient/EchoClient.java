@@ -1,4 +1,4 @@
-package examples.grpcclient;
+package example.grpcclient;
 
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;

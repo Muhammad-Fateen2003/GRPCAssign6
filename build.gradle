@@ -30,11 +30,11 @@ dependencies {
 
 protobuf {
     protoc {
-        artifact = 'com.google.protobuf:protoc:3.21.7'
+        artifact = 'com.google.protobuf:protoc:3.21.1'
     }
     plugins {
       grpc {
-        artifact = 'io.grpc:protoc-gen-grpc-java:1.52.1'
+        artifact = 'io.grpc:protoc-gen-grpc-java:1.49.1'
       }
     }
     generateProtoTasks {

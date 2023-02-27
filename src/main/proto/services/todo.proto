@@ -1,0 +1,60 @@
+/*
+This proto script defines a Todo service that allows clients to manage a list of tasks. The service supports three remote procedure calls (RPCs):
+"list": returns a list of tasks that the client can read
+"add": allows the client to add a new task to the list
+"complete": allows the client to mark a task as completed
+The service communicates using protobuf messages, including a Task message 
+that represents a single task in the list. The Task message includes an ID field 
+to uniquely identify each task, a boolean flag to indicate whether the task 
+is completed, a string description of the task, and an integer indicating the number of days
+ left to complete the task.
+
+The Todo service is designed to store the list of tasks in a persistent file format (e.g. JSON or protobuf), allowing the service to recover its state even after a server crash. The service supports error handling by including an error message in each response message when an error occurs.
+*/
+
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "service";
+option java_outer_classname = "TodoProto";
+
+import "google/protobuf/empty.proto";
+
+package services;
+
+service Todo {
+rpc list (google.protobuf.Empty) returns (TodoListResponse) {}
+rpc add (TodoAddRequest) returns (TodoAddResponse) {}
+rpc toggleComplete (TodoCompleteRequest) returns (TodoCompleteResponse) {}
+}
+
+message TodoListResponse {
+bool isSuccess = 1;
+repeated Task tasks = 2;
+string error = 3;
+}
+
+message TodoAddRequest {
+Task task = 1;
+}
+
+message TodoAddResponse {
+bool isSuccess = 1;
+string error = 2;
+}
+
+message TodoCompleteRequest {
+int32 taskId = 1;
+}
+
+message TodoCompleteResponse {
+bool isSuccess = 1;
+string error = 2;
+}
+
+message Task {
+int32 id = 1;
+bool isCompleted = 2;
+string task = 3;
+int32 daysLeft = 4;
+}

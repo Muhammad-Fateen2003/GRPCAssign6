@@ -1,7 +1,6 @@
 plugins {
   id 'java'
   id "com.google.protobuf" version "0.8.18" apply true
-
 }
 
 description = "Protocol Buffers Socket Example"
@@ -19,13 +18,16 @@ repositories {
 // json and protobuf dependencies 
 dependencies {
     implementation("io.grpc:grpc-stub:1.40.1")
+    implementation 'io.grpc:grpc-netty-shaded:1.41.0'
     implementation (name:'Registry', ext:'jar')
     implementation group: 'org.json', name: 'json', version: '20200518'
-    implementation 'io.grpc:grpc-netty-shaded:1.33.1'
     implementation 'io.grpc:grpc-protobuf:1.33.1'
     implementation 'io.grpc:grpc-stub:1.33.1'
+    implementation 'com.google.cloud:google-cloud-pubsub:1.114.7'
     compileOnly 'org.apache.tomcat:annotations-api:6.0.53' // necessary for Java 9+
     implementation group: 'com.google.protobuf', name: 'protobuf-java', version: '3.18.0'
+    implementation "com.google.protobuf:protobuf-java-util:3.21.1"
+    runtimeOnly "io.grpc:grpc-netty-shaded:1.49.1"
 }
 
 protobuf {
@@ -148,7 +150,7 @@ task runClient(type: JavaExec) {
   dependsOn arguments
   classpath = sourceSets.main.runtimeClasspath
   description = "Run Client"
-  main = 'example.grpcclient.EchoClient'
+  main = 'examples.grpcclient.EchoClient'
   standardInput = System.in
   // default args
   args serviceHost 
@@ -164,7 +166,7 @@ task runNode(type: JavaExec) {
   dependsOn arguments
   classpath = sourceSets.main.runtimeClasspath
   description = "Run Server"
-  main = 'example.grpcclient.Node'
+  main = 'examples.grpcclient.Node'
   // default args
   args registryHost
   args grpcPort

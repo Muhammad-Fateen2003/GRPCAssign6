@@ -60,21 +60,37 @@ public class HomeTownsImpl extends HometownsGrpc.HometownsImplBase {
         responseObserver.onCompleted();
     }
 
-    private void readDataFromFile() {
+// To delete after test
+    private void readDataFromFile2() {
         // Read the hometowns data from a JSON file or create a new list
         File jsonFile = new File("hometowns.json");
         if (jsonFile.exists()) {
             try (FileReader reader = new FileReader(jsonFile)) {
-                JsonFormat.parser().merge(reader, HometownsReadResponse.newBuilder());
-                this.hometownsList = HometownsReadResponse.newBuilder().addAllHometowns(hometownsList).build().getHometownsList();
+                HometownsReadResponse.Builder hometownsBuilder = HometownsReadResponse.newBuilder();
+                JsonFormat.parser().merge(reader, hometownsBuilder);
+                this.hometownsList = hometownsBuilder.getHometownsList();
             } catch (InvalidProtocolBufferException ex) {
                 System.err.println("Error with Protocol Buffer: " + ex.getMessage());
             } catch (IOException e) {
-                System.err.println("Error reading hometowns data from file: " + e.getMessage());
-                this.hometownsList = new ArrayList<>();
+                System.err.println("Error reading data from file: " + e.getMessage());
             } 
-        } else {
-            this.hometownsList = new ArrayList<>();
+        }
+    }
+
+    private void readDataFromFile() {
+        // Read the hometowns data from the hometowns JSON file
+        File jsonFile = new File("hometowns.json");
+        if (jsonFile.exists()) {        
+            try (FileReader reader = new FileReader(jsonFile)) {
+                JsonFormat.Parser parser = JsonFormat.parser();
+                HometownsReadResponse.Builder hometownsBuilder = HometownsReadResponse.newBuilder();
+                parser.merge(reader, hometownsBuilder);
+                hometownsList.addAll(hometownsBuilder.getHometownsList());
+            } catch (InvalidProtocolBufferException ex) {
+                System.err.println("Error with Protocol Buffer: " + ex.getMessage());
+            } catch (IOException e) {
+                System.out.println("Error reading data from file: " + e.getMessage());
+            }
         }
     }
     

@@ -7,12 +7,13 @@ import io.grpc.ManagedChannelBuilder;
 import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 import service.*;
-import examples.TestProtobuf;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.time.LocalDate;
+
 import com.google.protobuf.Empty; // needed to use Empty
 
 // just to show how to use the empty in the protobuf protocol
@@ -27,6 +28,7 @@ public class EchoClient {
   private final RegistryGrpc.RegistryBlockingStub blockingStub3;
   private final WeatherGrpc.WeatherBlockingStub blockingStub4;
   private final HometownsGrpc.HometownsBlockingStub blockingStub5;
+  private final TodoGrpc.TodoBlockingStub blockingStub6;
 
   /** Construct client for accessing server using the existing channel. */
   public EchoClient(Channel channel, Channel regChannel) {
@@ -41,6 +43,7 @@ public class EchoClient {
     blockingStub3 = RegistryGrpc.newBlockingStub(regChannel);
     blockingStub4 = WeatherGrpc.newBlockingStub(channel);
     blockingStub5 = HometownsGrpc.newBlockingStub(channel);
+    blockingStub6 = TodoGrpc.newBlockingStub(channel);
   }
 
   public void askServerToParrot(String message) {
@@ -192,6 +195,60 @@ public class EchoClient {
     }
   }
 
+  // Todo/Tasklist Service
+
+  public void getTodoList() {
+    Empty empty = Empty.newBuilder().build();
+    TodoListResponse response;
+    try {
+      response = blockingStub6.list(empty);
+      if (response.getIsSuccess()) {
+        for (Task task : response.getTasksList()) {
+          LocalDate dueDate = LocalDate.now().plusDays(task.getDaysLeft());
+          System.out.println((task.getIsCompleted() ? "[X] " : "[ ] ") + task.getId() + "- " + task.getTask() + " | Due on: " + dueDate);
+        }
+      } else {
+        System.err.println(response.getError()); 
+      }
+    } catch (Exception e) {
+      // TODO: handle exception
+    }
+
+  }
+
+  public void addTask(String descr, int daysLeft) {
+    Task task = Task.newBuilder().setIsCompleted(false).setTask(descr).setDaysLeft(daysLeft).build();
+    TodoAddRequest request = TodoAddRequest.newBuilder().setTask(task).build();
+    TodoAddResponse response;
+    try {
+      response = blockingStub6.add(request);
+      if (response.getIsSuccess()) {
+        System.out.println("Success!");
+      } else {
+        System.err.println(response.getError());
+      }
+    } catch (Exception e) {
+      // TODO: handle exception
+    }
+  }
+
+  public void toggleTaskCompletion(int taskid) {
+    TodoCompleteRequest request = TodoCompleteRequest.newBuilder().setTaskId(taskid).build();
+    TodoCompleteResponse response;
+    try {
+      response = blockingStub6.toggleComplete(request);
+      if (response.getIsSuccess()) {
+        System.out.println("Success!");
+      } else {
+        System.err.println(response.getError());
+      }
+    } catch (Exception e) {
+      // TODO: handle exception
+    }
+  }
+
+  // Registry Service
+
   public void getServices() {
     GetServicesReq request = GetServicesReq.newBuilder().build();
     ServicesListRes response;
@@ -233,9 +290,12 @@ public class EchoClient {
     System.out.println("1. Weather/listCities");
     System.out.println("2. Weather/inCity");
     System.out.println("3. Weather/atCoordinates");
-    System.out.println("4. Hometowns/search");
+    System.out.println("4. Hometowns/write");
     System.out.println("5. Hometowns/read");
-    System.out.println("6. Hometowns/write");
+    System.out.println("6. Hometowns/search");
+    System.out.println("7. Todo/add");
+    System.out.println("8. Todo/list");
+    System.out.println("9. Todo/toggleComplete");
     System.out.println("0. Exit");
   }
 
@@ -345,6 +405,22 @@ public class EchoClient {
             String cityString = scanner.next();
             client.searchHomeTowns(cityString);
             break;
+          case 7:
+            System.out.println("Enter your task description: ");
+            scanner.nextLine();
+            String descr = scanner.nextLine();
+            System.out.println("Enter how much days you have to complete your task: ");
+            int daysLeft = scanner.nextInt();
+            client.addTask(descr, daysLeft);
+            break;
+          case 8:
+            client.getTodoList();;
+            break;
+          case 9:
+            System.out.println("Enter the id of the task you want to complete: ");
+            int taskID = scanner.nextInt();
+            client.toggleTaskCompletion(taskID);
+            break;
           case 0:
             quit = true;
             break;
@@ -352,8 +428,6 @@ public class EchoClient {
             break;
         }
     }
-
-
 
       // client.getWeatherAtCooridates(33.4484, -112.0740);
 

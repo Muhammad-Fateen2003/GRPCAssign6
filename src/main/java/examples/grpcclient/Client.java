@@ -4,8 +4,10 @@ import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.InputMismatchException;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
@@ -26,7 +28,7 @@ import com.google.protobuf.Empty; // needed to use Empty
 /**
  * Client that requests `parrot` method from the `EchoServer`.
  */
-public class EchoClient {
+public class Client {
   private final EchoGrpc.EchoBlockingStub blockingStub;
   private final JokeGrpc.JokeBlockingStub blockingStub2;
   private final RegistryGrpc.RegistryBlockingStub blockingStub3;
@@ -35,7 +37,23 @@ public class EchoClient {
   private final TodoGrpc.TodoBlockingStub blockingStub6;
 
   /** Construct client for accessing server using the existing channel. */
-  public EchoClient(Channel channel, Channel regChannel) {
+  public Client(Channel regChannel) {
+    // 'channel' here is a Channel, not a ManagedChannel, so it is not this code's
+    // responsibility to
+    // shut it down.
+
+    // Passing Channels to code makes code easier to test and makes it easier to
+    // reuse Channels.
+    blockingStub = null;
+    blockingStub2 = null;
+    blockingStub3 = RegistryGrpc.newBlockingStub(regChannel);
+    blockingStub4 = null;
+    blockingStub5 = null;
+    blockingStub6 = null;
+  }
+
+  /** Construct client for accessing server using the existing channel. */
+  public Client(Channel channel, Channel regChannel) {
     // 'channel' here is a Channel, not a ManagedChannel, so it is not this code's
     // responsibility to
     // shut it down.
@@ -288,27 +306,33 @@ public class EchoClient {
 
   // Registry Service
 
-  public void getServices() {
+  public void getServices (List<String> services) {
     GetServicesReq request = GetServicesReq.newBuilder().build();
     ServicesListRes response;
     try {
-      response = blockingStub3.getServices(request);
-      System.out.println(response.toString());
+        response = blockingStub3.getServices(request);
+        for (String service : response.getServicesList()) {
+          services.add(service);
+        }
     } catch (Exception e) {
-      System.err.println("RPC failed: " + e);
-      return;
+        System.err.println("RPC failed: " + e);
+        return;
     }
-  }
+}
 
-  public void findServer(String name) {
+
+  public String findServer(String name) {
     FindServerReq request = FindServerReq.newBuilder().setServiceName(name).build();
     SingleServerRes response;
     try {
       response = blockingStub3.findServer(request);
       System.out.println(response.toString());
+      String host = response.getConnection().getUri();
+      int port = response.getConnection().getPort();
+      return host + ":" + port;
     } catch (Exception e) {
       System.err.println("RPC failed: " + e);
-      return;
+      return "";
     }
   }
 
@@ -324,6 +348,20 @@ public class EchoClient {
     }
   }
 
+  public String chooseService(List<String> services) {
+    System.out.println("Choose a service:");
+    for (int i = 0; i < services.size(); i++) {
+        System.out.println((i + 1) + ". " + services.get(i).toString());
+    }
+    Scanner scanner = new Scanner(new InputStreamReader(System.in));
+      int choice = scanner.nextInt();
+      if (choice < 1 || choice > services.size()) {
+          System.out.println("Invalid choice");
+          return "";
+      }
+      return services.get(choice - 1);
+}
+
   public static void printMenu() {
     System.out.println("Choose Which Service you want to run:");
     System.out.println("1. Weather/listCities");
@@ -337,7 +375,6 @@ public class EchoClient {
     System.out.println("9. Todo/toggleComplete");
     System.out.println("10. Joke/setJoke");
     System.out.println("11. Joke/getJoke");
-    System.out.println("11. Echo/parrot");
     System.out.println("0. Exit");
   }
 
@@ -370,17 +407,21 @@ public class EchoClient {
       System.exit(2);
     }
 
+    ManagedChannel channel = null;
+
     // Create a communication channel to the server, known as a Channel. Channels
     // are thread-safe
     // and reusable. It is common to create channels at the beginning of your
     // application and reuse
     // them until the application shuts down.
+    if (auto != 0) {
     String target = host + ":" + port;
-    ManagedChannel channel = ManagedChannelBuilder.forTarget(target)
+    channel = ManagedChannelBuilder.forTarget(target)
         // Channels are secure by default (via SSL/TLS). For the example we disable TLS
         // to avoid
         // needing certificates.
         .usePlaintext().build();
+    }
 
     String regTarget = regHost + ":" + regPort;
     ManagedChannel regChannel = ManagedChannelBuilder.forTarget(regTarget).usePlaintext().build();
@@ -413,7 +454,14 @@ public class EchoClient {
       // Just doing some hard coded calls to the service node without using the
       // registry
       // create client
-      EchoClient client = new EchoClient(channel, regChannel);
+
+        // ManagedChannel channel = null;
+
+        Client client = new Client(regChannel);
+        if (auto != 0) {
+          client = new Client(channel, regChannel);
+        }
+
       
       Map<String, String> citiesToRegions = new HashMap<>();
       citiesToRegions.put("New York", "NY");
@@ -428,8 +476,6 @@ public class EchoClient {
 
       Random random = new Random();
 
-      // call the parrot service on the server
-      client.askServerToParrot(message);
       if (auto != 0) {
         switch (auto) {
           case 1:
@@ -475,163 +521,165 @@ public class EchoClient {
           case 11:
             client.askForJokes(6);
             break;
+          case 12:
+            // call the parrot service on the server
+            client.askServerToParrot(message);
+            break;
           default:
               System.out.println("Invalid input. Please enter a number between 1-11.");
               break;
         }
-      } else {
-        boolean quit = false;
-        while(!quit){
-          printMenu();
-          Scanner scanner = new Scanner(new InputStreamReader(System.in));
-          int key = 0;
-          try {
-            key = scanner.nextInt();
-          } catch (InputMismatchException e) {
-            System.out.println("Invalid input, please enter a number.");
-            scanner.nextLine(); // consume the invalid input
-            continue;
-          }
-          switch (key) {
-            case 1:
-              client.getCityList();
-              break;
-            case 2:
-              System.out.println("Enter City Name: ");
-              scanner.nextLine();
-              String city = scanner.nextLine();
-              client.getWeatherInCity(city);
-              break;
-            case 3:
-              System.out.println("Enter Latitude: ");
-              double lat = 0.0;
-              try {
-                lat = scanner.nextDouble();
-              } catch (InputMismatchException e) {
-                System.out.println("Invalid input, please enter a number.");
-                scanner.nextLine(); // consume the invalid input
-                continue;
-              }
-              System.out.println("Enter Longitude: ");
-              double lon = 0.0;
-              try {
-                lon = scanner.nextDouble();
-              } catch (InputMismatchException e) {
-                System.out.println("Invalid input, please enter a number.");
-                scanner.nextLine(); // consume the invalid input
-                continue;
-              }
-              client.getWeatherAtCooridates(lat, lon);          
-              break;
-            case 4:
-              System.out.println("Enter your name: ");
-              scanner.nextLine();
-              String name = scanner.nextLine();
-              System.out.println("Enter the name of your city: ");
-              scanner.nextLine();
-              String cityName = scanner.nextLine();
-              System.out.println("Enter the name of your region: ");
-              scanner.nextLine();
-              String region = scanner.nextLine();
-              client.writeHomeTowns(name, cityName, region);
-              break;
-            case 5:
-              client.readHomeTowns();
-              break;
-            case 6:
-              System.out.println("Enter the name of a city: ");
-              scanner.nextLine();
-              String cityString = scanner.nextLine();
-              client.searchHomeTowns(cityString);
-              break;
-            case 7:
-              System.out.println("Enter your task description: ");
-              scanner.nextLine();
-              String descr = scanner.nextLine();
-              int daysLeft = 0;
-              try {
-                System.out.println("Enter how many days you have to complete your task: ");
-                daysLeft = scanner.nextInt();
-              } catch (InputMismatchException e) {
-                System.out.println("Invalid input, please enter a number.");
-                scanner.nextLine(); // consume the invalid input
-                continue;
-              }
-              client.addTask(descr, daysLeft);
-              break;
-            case 8:
-              client.getTodoList();
-              break;
-            case 9:
-              int taskID = 0;
-              try {
-                System.out.println("Enter the id of the task you want to complete: ");
-                taskID = scanner.nextInt();
-              } catch (InputMismatchException e) {
-                System.out.println("Invalid input, please enter a number.");
-                scanner.nextLine(); // consume the invalid input
-                continue;
-              }
-              client.toggleTaskCompletion(taskID);
-              break;
-            case 10:
-              System.out.println("Enter a joke: ");
-              scanner.nextLine();
-              String joke = scanner.nextLine();
-              client.setJoke(joke);
-              break;
-            case 11:
-              int num = 0;
-              try {
-                System.out.println("Enter the amount of jokes you want to get: ");
-                num = scanner.nextInt();
-              } catch (InputMismatchException e) {
-                System.out.println("Invalid input, please enter a number.");
-                scanner.nextLine(); // consume the invalid input
-                continue;
-              }
-              client.askForJokes(num);
-              break;
-            case 0:
-              quit = true;
-              break;
-            default:
-              System.out.println("Invalid input. Please enter a number between 0-11.");
-              break;
-          }
-        }
       }
-      
-
-      // client.getWeatherAtCooridates(33.4484, -112.0740);
-
-      // client.getWeatherInCity("Mecca");
-
-      // client.writeHomeTowns("Muhammad", "TX", "SOUTH");
-      // client.writeHomeTowns("Zaynab", "NY", "NORTH");
-      // client.readHomeTowns();
-      // client.searchHomeTowns("NY");
-
 
       // ############### Contacting the registry just so you see how it can be done
 
-      // if (args[5].equals("true")) { 
-      //   // Comment these last Service calls while in Activity 1 Task 1, they are not needed and wil throw issues without the Registry running
-      //   // get thread's services
-      //   client.getServices(); // get all registered services 
-
-      //   // get parrot
-      //   client.findServer("services.Echo/parrot"); // get ONE server that provides the parrot service
+      if (args[5].equals("true") && auto == 0) { 
+        // Comment these last Service calls while in Activity 1 Task 1, they are not needed and wil throw issues without the Registry running
+        // get thread's services
         
-      //   // get all setJoke
-      //   client.findServers("services.Joke/setJoke"); // get ALL servers that provide the setJoke service
+        // get thread's services
+        List<String> services = new ArrayList<>(); // get all registered services
+        client.getServices(services); 
+        String chosenService = client.chooseService(services); // choose a service from the list
+        String target = client.findServer(chosenService); // find the server for the chosen service 
+        try {
+          channel = ManagedChannelBuilder.forTarget(target)
+          // Channels are secure by default (via SSL/TLS). For the example we disable TLS
+          // to avoid
+          // needing certificates.
+          .usePlaintext().build();
+          client = new Client(channel, regChannel);
+        } catch (Exception e) {
+          System.err.println("Error: " + e.getMessage());
+        }
 
-      //   // get getJoke
-      //   client.findServer("services.Joke/getJoke"); // get ALL servers that provide the getJoke service
 
-      //   // does not exist
-      //   client.findServer("random"); // shows the output if the server does not find a given service
-      // }
+
+        Scanner scanner = new Scanner(new InputStreamReader(System.in));
+        switch (chosenService) {
+          case "services.Weather/listCities":
+            client.getCityList();
+            break;
+          case "services.Weather/inCity":
+            System.out.println("Enter City Name: ");
+            String city = scanner.nextLine();
+            client.getWeatherInCity(city);
+            break;
+          case "services.Weather/atCoordinates":
+            System.out.println("Enter Latitude: ");
+            double lat = 0.0;
+            try {
+              lat = scanner.nextDouble();
+            } catch (InputMismatchException e) {
+              System.out.println("Invalid input, please enter a number.");
+              scanner.nextLine(); // consume the invalid input
+              break;
+            }
+            System.out.println("Enter Longitude: ");
+            double lon = 0.0;
+            try {
+              lon = scanner.nextDouble();
+            } catch (InputMismatchException e) {
+              System.out.println("Invalid input, please enter a number.");
+              scanner.nextLine(); // consume the invalid input
+              break;
+            }
+            client.getWeatherAtCooridates(lat, lon);          
+            break;
+          case "services.Hometowns/write":
+            System.out.println("Enter your name: ");
+            String name = scanner.nextLine();
+            System.out.println("Enter the name of your city: ");
+            String cityName = scanner.nextLine();
+            System.out.println("Enter the name of your region: ");
+            String region = scanner.nextLine();
+            client.writeHomeTowns(name, cityName, region);
+            break;
+          case "services.Hometowns/read":
+            client.readHomeTowns();
+            break;
+          case "services.Hometowns/search":
+            System.out.println("Enter the name of a city: ");
+            String cityString = scanner.nextLine();
+            client.searchHomeTowns(cityString);
+            break;
+          case "services.Todo/add":
+            System.out.println("Enter your task description: ");
+            String descr = scanner.nextLine();
+            int daysLeft = 0;
+            try {
+              System.out.println("Enter how many days you have to complete your task: ");
+              daysLeft = scanner.nextInt();
+            } catch (InputMismatchException e) {
+              System.out.println("Invalid input, please enter a number.");
+              scanner.nextLine(); // consume the invalid input
+              break;
+            }
+            client.addTask(descr, daysLeft);
+            break;
+          case "services.Todo/list":
+            client.getTodoList();
+            break;
+          case "services.Todo/toggleComplete":
+            int taskID = 0;
+            try {
+              System.out.println("Enter the id of the task you want to complete: ");
+              taskID = scanner.nextInt();
+            } catch (InputMismatchException e) {
+              System.out.println("Invalid input, please enter a number.");
+              scanner.nextLine(); // consume the invalid input
+              break;
+            }
+            client.toggleTaskCompletion(taskID);
+            break;
+          case "services.Joke/setJoke":
+            System.out.println("Enter a joke: ");
+            String joke = scanner.nextLine();
+            client.setJoke(joke);
+            break;
+          case "services.Joke/getJoke":
+            int num = 0;
+            try {
+              System.out.println("Enter the amount of jokes you want to get: ");
+              num = scanner.nextInt();
+            } catch (InputMismatchException e) {
+              System.out.println("Invalid input, please enter a number.");
+              scanner.nextLine(); // consume the invalid input
+              break;
+            }
+            client.askForJokes(num);
+            break;
+            case "services.Echo/parrot":
+            System.out.println("Enter a phrase you want the server to parrot: ");
+            String parrot = scanner.nextLine();
+            client.askServerToParrot(parrot);
+            break;
+            case "services.Registry/getServices":
+              client.getServices(services); 
+              System.out.println("Getting Services:");
+              for (int i = 0; i < services.size(); i++) {
+                  System.out.println((i + 1) + ". " + services.get(i).toString());
+              }
+              break;
+            case "services.Registry/findServer":
+            System.out.println("Enter a Service: ");
+            String service = scanner.nextLine();
+            client.findServer(service);
+              break;
+            case "services.Registry/findServers":
+              System.out.println("Enter a Service: ");
+              String servicesString = scanner.nextLine();
+              client.findServers(servicesString);
+              break;
+            case "services.Registry/register":
+              System.out.println("Not sure how to do this one :(");
+              break;
+          default:
+            System.out.println("Error: Unavailable Service!");
+            break;
+        }
+
+      }
 
     } finally {
       // ManagedChannels use resources like threads and TCP connections. To prevent
@@ -639,7 +687,12 @@ public class EchoClient {
       // resources the channel should be shut down when it will no longer be used. If
       // it may be used
       // again leave it running.
+      if(channel == null) {
+        System.out.println("Server Unavailable");
+        System.out.println("Closing...");
+      } else {
       channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
+      }
       regChannel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
     }
   }

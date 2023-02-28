@@ -26,10 +26,18 @@ public class TodoImpl extends TodoGrpc.TodoImplBase {
     @Override
     public void list(Empty request, StreamObserver<TodoListResponse> responseObserver) {
         List<Task> tasks = new ArrayList<>(taskMap.values());
-        TodoListResponse response = TodoListResponse.newBuilder()
-                .setIsSuccess(true)
-                .addAllTasks(tasks)
-                .build();
+        TodoListResponse response;
+        try {
+            response = TodoListResponse.newBuilder()
+                    .setIsSuccess(true)
+                    .addAllTasks(tasks)
+                    .build();
+        } catch (Exception e) {
+            response = TodoListResponse.newBuilder()
+            .setIsSuccess(false)
+            .setError("Error Lisiting: " + e.getMessage())
+            .build();
+        }
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -40,10 +48,18 @@ public class TodoImpl extends TodoGrpc.TodoImplBase {
         int taskId = taskMap.size() + 1;
         task = task.toBuilder().setId(taskId).build();
         taskMap.put(taskId, task);
-        writeDataToFile();
-        TodoAddResponse response = TodoAddResponse.newBuilder()
-                .setIsSuccess(true)
-                .build();
+        TodoAddResponse response;
+        try {
+            writeDataToFile();
+            response = TodoAddResponse.newBuilder()
+                    .setIsSuccess(true)
+                    .build();
+        } catch(IOException e) {
+            response = TodoAddResponse.newBuilder()
+            .setIsSuccess(false)
+            .setError("Error adding tasks to file: " + e.getMessage())
+            .build();
+        }
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -63,10 +79,18 @@ public class TodoImpl extends TodoGrpc.TodoImplBase {
         }
         task = task.toBuilder().setIsCompleted(!task.getIsCompleted()).build();
         taskMap.put(taskId, task);
-        writeDataToFile();
-        TodoCompleteResponse response = TodoCompleteResponse.newBuilder()
-                .setIsSuccess(true)
-                .build();
+        TodoCompleteResponse response;
+        try {
+            writeDataToFile();
+            response = TodoCompleteResponse.newBuilder()
+                    .setIsSuccess(true)
+                    .build();
+        } catch(IOException e) {
+            response = TodoCompleteResponse.newBuilder()
+            .setIsSuccess(false)
+            .setError("Error Toggling tasks: " + e.getMessage())
+            .build();
+        }
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -90,13 +114,14 @@ public class TodoImpl extends TodoGrpc.TodoImplBase {
         }
     }   
 
-    private void writeDataToFile() {
+    private void writeDataToFile() throws IOException{
         // Save the updated list to a JSON file
         File jsonFile = new File("todolist.json");
         try (FileWriter writer = new FileWriter(jsonFile)) {
             JsonFormat.printer().appendTo(TodoListResponse.newBuilder().addAllTasks(taskMap.values()).build(), writer);
         } catch (IOException e) {
-            System.err.println("Error writing hometowns data to file: " + e.getMessage());
+            // System.err.println("Error writing hometowns data to file: " + e.getMessage());
+            throw new IOException();
         }
     }
     

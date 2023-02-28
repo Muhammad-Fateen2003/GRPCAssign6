@@ -4,6 +4,8 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 
+import io.grpc.protobuf.StatusProto;
+import com.google.rpc.Status;
 import io.grpc.stub.StreamObserver;
 import service.*;
 import service.HometownsGrpc.HometownsImplBase;
@@ -23,8 +25,13 @@ public class HomeTownsImpl extends HometownsGrpc.HometownsImplBase {
     @Override
     public void read(Empty request, StreamObserver<HometownsReadResponse> responseObserver) {
         HometownsReadResponse.Builder responseBuilder = HometownsReadResponse.newBuilder();
-        responseBuilder.addAllHometowns(hometownsList);
-        responseBuilder.setIsSuccess(true);
+        try{
+            responseBuilder.addAllHometowns(hometownsList);
+            responseBuilder.setIsSuccess(true);
+        } catch (Exception e) {
+            responseBuilder.setIsSuccess(false);
+            responseBuilder.setError("Error Reading: " + e.getMessage());
+        }
         responseObserver.onNext(responseBuilder.build());
         responseObserver.onCompleted();
     }
@@ -41,8 +48,13 @@ public class HomeTownsImpl extends HometownsGrpc.HometownsImplBase {
         }
     
         HometownsReadResponse.Builder responseBuilder = HometownsReadResponse.newBuilder();
-        responseBuilder.addAllHometowns(matchingHometowns);
-        responseBuilder.setIsSuccess(true);
+        try{
+            responseBuilder.addAllHometowns(matchingHometowns);
+            responseBuilder.setIsSuccess(true);
+        } catch (Exception e) {
+            responseBuilder.setIsSuccess(false);
+            responseBuilder.setError("Error Reading File: " + e.getMessage());
+        }
         responseObserver.onNext(responseBuilder.build());
         responseObserver.onCompleted();
     }
@@ -53,29 +65,36 @@ public class HomeTownsImpl extends HometownsGrpc.HometownsImplBase {
         if(!hometownsList.contains(hometown)) {
             hometownsList.add(hometown);
         }
-        writeDataToFile(); // save updated data to file
-        HometownsWriteResponse.Builder responseBuilder = HometownsWriteResponse.newBuilder();
-        responseBuilder.setIsSuccess(true);
+        HometownsWriteResponse.Builder responseBuilder;
+        try{
+            writeDataToFile(); // save updated data to file
+            responseBuilder = HometownsWriteResponse.newBuilder();
+            responseBuilder.setIsSuccess(true);
+        } catch(IOException e1) {
+            responseBuilder = HometownsWriteResponse.newBuilder();
+            responseBuilder.setIsSuccess(false);
+            responseBuilder.setError("Error writing hometowns data to file: " + e1.getMessage());
+        }
         responseObserver.onNext(responseBuilder.build());
         responseObserver.onCompleted();
     }
 
 // To delete after test
-    private void readDataFromFile2() {
-        // Read the hometowns data from a JSON file or create a new list
-        File jsonFile = new File("hometowns.json");
-        if (jsonFile.exists()) {
-            try (FileReader reader = new FileReader(jsonFile)) {
-                HometownsReadResponse.Builder hometownsBuilder = HometownsReadResponse.newBuilder();
-                JsonFormat.parser().merge(reader, hometownsBuilder);
-                this.hometownsList = hometownsBuilder.getHometownsList();
-            } catch (InvalidProtocolBufferException ex) {
-                System.err.println("Error with Protocol Buffer: " + ex.getMessage());
-            } catch (IOException e) {
-                System.err.println("Error reading data from file: " + e.getMessage());
-            } 
-        }
-    }
+    // private void readDataFromFile2() {
+    //     // Read the hometowns data from a JSON file or create a new list
+    //     File jsonFile = new File("hometowns.json");
+    //     if (jsonFile.exists()) {
+    //         try (FileReader reader = new FileReader(jsonFile)) {
+    //             HometownsReadResponse.Builder hometownsBuilder = HometownsReadResponse.newBuilder();
+    //             JsonFormat.parser().merge(reader, hometownsBuilder);
+    //             this.hometownsList = hometownsBuilder.getHometownsList();
+    //         } catch (InvalidProtocolBufferException ex) {
+    //             System.err.println("Error with Protocol Buffer: " + ex.getMessage());
+    //         } catch (IOException e) {
+    //             System.err.println("Error reading data from file: " + e.getMessage());
+    //         } 
+    //     }
+    // }
 
     private void readDataFromFile() {
         // Read the hometowns data from the hometowns JSON file
@@ -93,14 +112,17 @@ public class HomeTownsImpl extends HometownsGrpc.HometownsImplBase {
             }
         }
     }
+
     
-    private void writeDataToFile() {
+    
+    private void writeDataToFile() throws IOException{
         // Save the updated list to a JSON file
         File jsonFile = new File("hometowns.json");
         try (FileWriter writer = new FileWriter(jsonFile)) {
             JsonFormat.printer().appendTo(HometownsReadResponse.newBuilder().addAllHometowns(hometownsList).build(), writer);
         } catch (IOException e) {
-            System.err.println("Error writing hometowns data to file: " + e.getMessage());
+            //System.err.println("Error writing hometowns data to file: " + e.getMessage());
+            throw new IOException();
         }
     }
 }

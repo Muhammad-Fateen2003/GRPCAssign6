@@ -325,6 +325,7 @@ public class EchoClient {
   }
 
   public static void printMenu() {
+    System.out.println();
     System.out.println("Choose Which Service you want to run:");
     System.out.println("1. Weather/listCities");
     System.out.println("2. Weather/inCity");
@@ -428,8 +429,6 @@ public class EchoClient {
 
       Random random = new Random();
 
-      // call the parrot service on the server
-      client.askServerToParrot(message);
       if (auto != 0) {
         switch (auto) {
           case 1:
@@ -475,6 +474,10 @@ public class EchoClient {
           case 11:
             client.askForJokes(6);
             break;
+          case 12:
+            // call the parrot service on the server
+            client.askServerToParrot(message);
+          break;
           default:
               System.out.println("Invalid input. Please enter a number between 1-11.");
               break;
@@ -528,10 +531,8 @@ public class EchoClient {
               scanner.nextLine();
               String name = scanner.nextLine();
               System.out.println("Enter the name of your city: ");
-              scanner.nextLine();
               String cityName = scanner.nextLine();
               System.out.println("Enter the name of your region: ");
-              scanner.nextLine();
               String region = scanner.nextLine();
               client.writeHomeTowns(name, cityName, region);
               break;
@@ -591,6 +592,11 @@ public class EchoClient {
                 continue;
               }
               client.askForJokes(num);
+              break;
+            case 12:
+              System.out.println("Enter a phrase you want the server to parrot: ");
+              String parrot = scanner.nextLine();
+              client.askServerToParrot(parrot);
               break;
             case 0:
               quit = true;

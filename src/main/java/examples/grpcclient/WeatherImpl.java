@@ -98,12 +98,21 @@ public class WeatherImpl extends WeatherGrpc.WeatherImplBase{
       cityCoordinates.put("Mecca", new double[] {21.3891, 39.8579});
       cityCoordinates.put("Madinah", new double[] {24.5247, 39.5692});
 
-      double[] coordinates = cityCoordinates.get(request.getCityName());
-      if (coordinates == null) {
-          throw new IllegalArgumentException("Invalid city name: " + request.getCityName());
-      }
+      if (!cityCoordinates.containsKey(request.getCityName())) {
+        WeatherResponse.Builder responseBuilder = WeatherResponse.newBuilder();
+        responseBuilder.setIsSuccess(false);
+        responseBuilder.setError("Error: City Unavailable");
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
+      } else {
 
-      getWeatherAtCooridates(coordinates[0], coordinates[1], responseObserver);      
+        double[] coordinates = cityCoordinates.get(request.getCityName());
+        if (coordinates == null) {
+            throw new IllegalArgumentException("Invalid city name: " + request.getCityName());
+        }
+
+        getWeatherAtCooridates(coordinates[0], coordinates[1], responseObserver);
+    }      
   }
   
   @Override

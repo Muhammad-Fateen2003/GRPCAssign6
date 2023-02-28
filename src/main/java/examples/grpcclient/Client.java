@@ -650,11 +650,12 @@ public class Client {
             client.askForJokes(num);
             break;
             case "services.Echo/parrot":
-            System.out.println("Enter a phrase you want the server to parrot: ");
-            String parrot = scanner.nextLine();
-            client.askServerToParrot(parrot);
+              System.out.println("Enter a phrase you want the server to parrot: ");
+              String parrot = scanner.nextLine();
+              client.askServerToParrot(parrot);
             break;
             case "services.Registry/getServices":
+              services.clear();
               client.getServices(services); 
               System.out.println("Getting Services:");
               for (int i = 0; i < services.size(); i++) {
